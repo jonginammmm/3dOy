@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ultra Realistic 3D Saturn</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #020208; 
+            overflow: hidden; 
+            touch-action: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #canvas-container { width: 100vw; height: 100vh; }
+        .title {
+            position: absolute;
+            top: 25px;
+            width: 100%;
+            text-align: center;
+            color: #f3e5ab;
+            font-size: 26px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            pointer-events: none;
+            z-index: 10;
+            text-shadow: 0 0 15px rgba(243, 229, 171, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="title">Saturn 🪐</div>
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        const container = document.getElementById('canvas-container');
+
+        // Scene, Camera, Renderer
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.2, 5.5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        container.appendChild(renderer.domElement);
+
+        // Erkin 360 darajali boshqaruv (OrbitControls)
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.rotateSpeed = 0.8;
+        controls.zoomSpeed = 1.2;
+        controls.minDistance = 2.0;
+        controls.maxDistance = 15;
+
+        // --- SATURN VA UZUK TEKSTURALARINI DASTURIY YARATISH (O'chib qolmasligi uchun) ---
+        function createSaturnTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 2048;
+            canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0.0, '#3a2e2b');
+            gradient.addColorStop(0.2, '#cba378');
+            gradient.addColorStop(0.35, '#e8d3b3');
+            gradient.addColorStop(0.5, '#b89468');
+            gradient.addColorStop(0.65, '#d3b78c');
+            gradient.addColorStop(0.8, '#a6825c');
+            gradient.addColorStop(1.0, '#2e2523');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Chiziqlar qo'shish (Saturn atmosferasi)
+            for (let i = 0; i < 300; i++) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.05})`;
+                ctx.fillRect(0, Math.random() * canvas.height, canvas.width, Math.random() * 4 + 1);
+            }
+
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createRingTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 2048;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+            gradient.addColorStop(0.0, 'rgba(0,0,0,0)');
+            gradient.addColorStop(0.1, 'rgba(160, 130, 95, 0.2)');
+            gradient.addColorStop(0.3, 'rgba(215, 185, 145, 0.9)');
+            gradient.addColorStop(0.5, 'rgba(140, 110, 80, 0.4)');
+            gradient.addColorStop(0.75, 'rgba(230, 200, 160, 0.95)');
+            gradient.addColorStop(0.9, 'rgba(170, 140, 105, 0.6)');
+            gradient.addColorStop(0.95, 'rgba(100, 80, 60, 0.2)');
+            gradient.addColorStop(1.0, 'rgba(0,0,0,0)');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Uzuklar orasidagi nozik tirqishlar (Cassini division)
+            for (let i = 0; i < 150; i++) {
+                const pos = Math.random() * canvas.width;
+                ctx.fillStyle = `rgba(0, 0, 0, ${Math.random() * 0.6})`;
+                ctx.fillRect(pos, 0, Math.random() * 3 + 1, canvas.height);
+            }
+
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        const saturnTexture = createSaturnTexture();
+        const ringTexture = createRingTexture();
+
+        // 1. Saturn Sayyorasi
+        const saturnRadius = 1.2;
+        const saturnGeo = new THREE.SphereGeometry(saturnRadius, 64, 64);
+        const saturnMat = new THREE.MeshStandardMaterial({
+            map: saturnTexture,
+            roughness: 0.8,
+            metalness: 0.1
+        });
+
+        const saturn = new THREE.Mesh(saturnGeo, saturnMat);
+        saturn.castShadow = true;
+        saturn.receiveShadow = true;
+
+        // 2. Saturn Uzugi (Rings)
+        const innerRadius = 1.45;
+        const outerRadius = 2.7;
+        const ringGeo = new THREE.RingGeometry(innerRadius, outerRadius, 128);
+
+        // UV Koordinatlarini to'g'rilash
+        const pos = ringGeo.attributes.position;
+        const uv = ringGeo.attributes.uv;
+        for (let i = 0; i < pos.count; i++) {
+            const vertex = new THREE.Vector3();
+            vertex.fromBufferAttribute(pos, i);
+            const distance = vertex.length();
+            const u = (distance - innerRadius) / (outerRadius - innerRadius);
+            uv.setXY(i, u, 0.5);
+        }
+
+        const ringMat = new THREE.MeshStandardMaterial({
+            map: ringTexture,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.95,
+            roughness: 0.4
+        });
+
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = Math.PI / 2;
+        ring.castShadow = true;
+        ring.receiveShadow = true;
+
+        // Group (Saturn va uzukni bitta qilib 26.7 darajaga qiyaytirish)
+        const saturnGroup = new THREE.Group();
+        saturnGroup.add(saturn);
+        saturnGroup.add(ring);
+        saturnGroup.rotation.z = THREE.MathUtils.degToRad(26.73);
+        scene.add(saturnGroup);
+
+        // 3. Yoritish (Quyosh nuri)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfff5ea, 2.2);
+        sunLight.position.set(6, 2, 5);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        scene.add(sunLight);
+
+        // Fon uchun yulduzlar
+        const starsGeo = new THREE.BufferGeometry();
+        const starsCount = 800;
+        const starPositions = new Float32Array(starsCount * 3);
+        for(let i = 0; i < starsCount * 3; i++) {
+            starPositions[i] = (Math.random() - 0.5) * 100;
+        }
+        starsGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const starsMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.15, transparent: true, opacity: 0.8 });
+        const starField = new THREE.Points(starsGeo, starsMat);
+        scene.add(starField);
+
+        // Ekran o'lchami o'zgarganda
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Animatsiya sikli (Turgan joyida o'zi aylanmaydi)
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); // Barmoq bilan surilgandagi inersiya
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
